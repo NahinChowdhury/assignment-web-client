@@ -34,10 +34,10 @@ class HTTPResponse(object):
 
 class HTTPClient(object):
     def get_host_port(self,url):
-        parsed_url = urllib.parse.urlparse(url)
-        host = parsed_url.hostname
-        port = parsed_url.port
-        if port == None:
+        parsedUrl = urllib.parse.urlparse(url)
+        host = parsedUrl.hostname
+        port = parsedUrl.port
+        if not port:
             port = 80
         return host, port
 
@@ -47,13 +47,13 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        return int(data.split()[1])
 
     def get_headers(self,data):
         return None
 
     def get_body(self, data):
-        return None
+        return data.split("\r\n\r\n")[1]
     
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
@@ -65,23 +65,26 @@ class HTTPClient(object):
     def recvall(self, sock):
         buffer = bytearray()
         done = False
+        
         while not done:
             part = sock.recv(1024)
             if (part):
                 buffer.extend(part)
             else:
-                done = not part
+                done = True
+        
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
         host, port = self.get_host_port(url)
         self.connect(host, port)
-        parsed_url = urllib.parse.urlparse(url)
-        path = parsed_url.path
+        
+        parsedUrl = urllib.parse.urlparse(url)
+        path = parsedUrl.path
         if path == "":
             path = "/"
-        if parsed_url.query != "":
-            path = path + "?" + parsed_url.query
+        if parsedUrl.query != "":
+            path = path + "?" + parsedUrl.query
         
         request = "GET " + path + " HTTP/1.1\r\n" + \
                     "Host: " + host + "\r\n" + \
@@ -91,21 +94,22 @@ class HTTPClient(object):
 
         response = self.recvall(self.socket)
         self.close()
-        code = int(response.split()[1])
 
-        body = response.split("\r\n\r\n")[1]
+        code = self.get_code(response)
+        body = self.get_body(response)
 
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
         host, port = self.get_host_port(url)
         self.connect(host, port)
-        parsed_url = urllib.parse.urlparse(url)
-        path = parsed_url.path
+        
+        parsedUrl = urllib.parse.urlparse(url)
+        path = parsedUrl.path
         if path == "":
             path = "/"
-        if parsed_url.query != "":
-            path = path + "?" + parsed_url.query
+        if parsedUrl.query != "":
+            path = path + "?" + parsedUrl.query
         
         if args != None:
             content = urllib.parse.urlencode(args)
@@ -125,8 +129,9 @@ class HTTPClient(object):
 
         response = self.recvall(self.socket)
         self.close()
-        code = int(response.split()[1])
-        body = response.split("\r\n\r\n")[1]
+
+        code = self.get_code(response)
+        body = self.get_body(response)
        
         return HTTPResponse(code, body)
 
